@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>家計簿アプリ モックアップ</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            background: #1976D2;
+            color: white;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .menu-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        /* Content */
+        .content {
+            padding: 20px;
+        }
+
+        /* Month selector */
+        .month-selector {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .month-btn {
+            background: #f0f0f0;
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .month-btn:hover {
+            background: #e0e0e0;
+        }
+
+        .month-display {
+            font-size: 16px;
+            font-weight: 600;
+            min-width: 100px;
+            text-align: center;
+        }
+
+        /* Summary box */
+        .summary-box {
+            background: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+
+        .summary-item {
+            text-align: center;
+        }
+
+        .summary-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .summary-amount {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .income {
+            color: #1976D2;
+        }
+
+        .expense {
+            color: #E53935;
+        }
+
+        .balance {
+            color: #333;
+        }
+
+        /* Action buttons */
+        .action-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .btn {
+            padding: 12px 16px;
+            border: none;
+            border-radius: 4px;
+            background: #1976D2;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.3s;
+        }
+
+        .btn:hover {
+            background: #1565C0;
+        }
+
+        /* Records section */
+        .records-header {
+            font-size: 14px;
+            font-weight: 600;
+            color: #666;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .records-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .record-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .record-item:hover {
+            background: #f9f9f9;
+        }
+
+        .record-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .record-date {
+            font-size: 12px;
+            color: #666;
+            min-width: 70px;
+        }
+
+        .record-category {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+        }
+
+        .record-amount {
+            font-size: 14px;
+            font-weight: 600;
+            min-width: 100px;
+            text-align: right;
+        }
+
+        /* Dialog modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .modal-header h2 {
+            font-size: 16px;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: #333;
+        }
+
+        .form-input,
+        .form-select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .form-input:focus,
+        .form-select:focus {
+            outline: none;
+            border-color: #1976D2;
+            box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.1);
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 20px;
+        }
+
+        .radio-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+            justify-content: flex-end;
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        /* Category management styles */
+        .category-section {
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #666;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .category-list {
+            list-style: none;
+        }
+
+        .category-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .category-name {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .category-badge {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .delete-btn {
+            background: #E53935;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .delete-btn:hover {
+            background: #C62828;
+        }
+
+        /* Back button */
+        .back-btn {
+            background: #f0f0f0;
+            color: #333;
+            margin-bottom: 16px;
+            display: inline-block;
+        }
+
+        .back-btn:hover {
+            background: #e0e0e0;
+        }
+
+        /* Page visibility */
+        .page {
+            display: none;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #4CAF50;
+            color: white;
+            padding: 16px 20px;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            display: none;
+            z-index: 2000;
+        }
+
+        .toast.show {
+            display: block;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* Chart placeholder */
+        .chart-placeholder {
+            background: #f9f9f9;
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            color: #999;
+            font-size: 14px;
+            margin: 40px 0;
+        }
+
+        .chart-placeholder-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Home Page -->
+    <div id="home-page" class="page active">
+        <div class="container">
+            <div class="header">
+                <h1>家計簿アプリ</h1>
+                <button class="menu-btn" onclick="toggleMenu()">☰</button>
+            </div>
+
+            <div class="content">
+                <!-- Month selector -->
+                <div class="month-selector">
+                    <button class="month-btn">◀ 5月</button>
+                    <div class="month-display">6月</div>
+                    <button class="month-btn">7月 ▶</button>
+                </div>
+
+                <!-- Summary box -->
+                <div class="summary-box">
+                    <div class="summary-grid">
+                        <div class="summary-item">
+                            <div class="summary-label">収入</div>
+                            <div class="summary-amount income">¥200,000</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">支出</div>
+                            <div class="summary-amount expense">¥150,000</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">残高</div>
+                            <div class="summary-amount balance">¥50,000</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action buttons -->
+                <div class="action-buttons">
+                    <button class="btn" onclick="goToChart()">📊 グラフを見る</button>
+                    <button class="btn" onclick="openNewRecordDialog()">➕ 新しく記録</button>
+                    <button class="btn" onclick="goToCategories()">🔧 カテゴリ管理</button>
+                </div>
+
+                <!-- Records list -->
+                <div class="records-header">記録一覧（6月）</div>
+                <div class="records-list">
+                    <div class="record-item" onclick="openEditDialog()">
+                        <div class="record-left">
+                            <div class="record-date">6/15（日）</div>
+                            <div class="record-category">🍔 食費</div>
+                        </div>
+                        <div class="record-amount expense">-¥1,500</div>
+                    </div>
+                    <div class="record-item" onclick="openEditDialog()">
+                        <div class="record-left">
+                            <div class="record-date">6/14（土）</div>
+                            <div class="record-category">💼 給料</div>
+                        </div>
+                        <div class="record-amount income">+¥150,000</div>
+                    </div>
+                    <div class="record-item" onclick="openEditDialog()">
+                        <div class="record-left">
+                            <div class="record-date">6/10（月）</div>
+                            <div class="record-category">🚌 交通費</div>
+                        </div>
+                        <div class="record-amount expense">-¥2,000</div>
+                    </div>
+                    <div class="record-item" onclick="openEditDialog()">
+                        <div class="record-left">
+                            <div class="record-date">6/05（水）</div>
+                            <div class="record-category">💡 光熱費</div>
+                        </div>
+                        <div class="record-amount expense">-¥8,500</div>
+                    </div>
+                    <div class="record-item" onclick="openEditDialog()">
+                        <div class="record-left">
+                            <div class="record-date">6/02（日）</div>
+                            <div class="record-category">🎬 娯楽費</div>
+                        </div>
+                        <div class="record-amount expense">-¥3,000</div>
+                    </div>
+                    <div class="record-item" onclick="openEditDialog()">
+                        <div class="record-left">
+                            <div class="record-date">6/01（土）</div>
+                            <div class="record-category">🏠 家賃・住宅</div>
+                        </div>
+                        <div class="record-amount expense">-¥80,000</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart Page -->
+    <div id="chart-page" class="page">
+        <div class="container">
+            <div class="header">
+                <h1>月別収支グラフ</h1>
+                <button class="menu-btn" onclick="goHome()">✕</button>
+            </div>
+
+            <div class="content">
+                <button class="btn back-btn" onclick="goHome()">← 戻る</button>
+
+                <h2 style="font-size: 16px; margin-bottom: 24px;">過去6ヶ月の推移</h2>
+
+                <div class="chart-placeholder">
+                    <div class="chart-placeholder-icon">📊</div>
+                    <p>グラフはここに表示されます</p>
+                    <p style="font-size: 12px; margin-top: 8px;">（実装時：recharts を使用）</p>
+                </div>
+
+                <div style="text-align: center; color: #999; font-size: 12px;">
+                    <p>■ 収入（青）  ■ 支出（赤）</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Categories Page -->
+    <div id="categories-page" class="page">
+        <div class="container">
+            <div class="header">
+                <h1>カテゴリ管理</h1>
+                <button class="menu-btn" onclick="goHome()">✕</button>
+            </div>
+
+            <div class="content">
+                <button class="btn back-btn" onclick="goHome()">← 戻る</button>
+
+                <!-- Initial categories section -->
+                <div class="category-section">
+                    <div class="section-title">初期カテゴリ（編集不可）</div>
+                    <ul class="category-list">
+                        <li class="category-item">
+                            <div class="category-name">
+                                🍔 食費
+                                <span class="category-badge">✓</span>
+                            </div>
+                        </li>
+                        <li class="category-item">
+                            <div class="category-name">
+                                🚌 交通費
+                                <span class="category-badge">✓</span>
+                            </div>
+                        </li>
+                        <li class="category-item">
+                            <div class="category-name">
+                                🎬 娯楽費
+                                <span class="category-badge">✓</span>
+                            </div>
+                        </li>
+                        <li class="category-item">
+                            <div class="category-name">
+                                💊 医療費
+                                <span class="category-badge">✓</span>
+                            </div>
+                        </li>
+                        <li class="category-item">
+                            <div class="category-name">
+                                👕 衣服費
+                                <span class="category-badge">✓</span>
+                            </div>
+                        </li>
+                        <li class="category-item">
+                            <div class="category-name">
+                                🏠 家賃・住宅
+                                <span class="category-badge">✓</span>
+                            </div>
+                        </li>
+                        <li class="category-item">
+                            <div class="category-name">
+                                💡 光熱費
+                                <span class="category-badge">✓</span>
+                            </div>
+                        </li>
+                        <li class="category-item">
+                            <div class="category-name">
+                                📱 通信費
+                                <span class="category-badge">✓</span>
+                            </div>
+                        </li>
+                        <li class="category-item">
+                            <div class="category-name">
+                                💼 仕事関連
+                                <span class="category-badge">✓</span>
+                            </div>
+                        </li>
+                        <li class="category-item">
+                            <div class="category-name">
+                                🎁 その他
+                                <span class="category-badge">✓</span>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- User created categories section -->
+                <div class="category-section">
+                    <div class="section-title">ユーザー作成カテゴリ</div>
+                    <ul class="category-list">
+                        <li class="category-item">
+                            <div class="category-name">🎓 教育費</div>
+                            <button class="delete-btn">削除</button>
+                        </li>
+                        <li class="category-item">
+                            <div class="category-name">🐶 ペット費</div>
+                            <button class="delete-btn">削除</button>
+                        </li>
+                        <li class="category-item">
+                            <div class="category-name">🎮 ゲーム・趣味</div>
+                            <button class="delete-btn">削除</button>
+                        </li>
+                    </ul>
+                </div>
+
+                <button class="btn" style="width: 100%; margin-top: 24px;" onclick="openNewCategoryDialog()">
+                    ➕ 新規カテゴリ追加
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Record Dialog -->
+    <div id="new-record-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>新しく記録</h2>
+                <button class="close-btn" onclick="closeNewRecordDialog()">✕</button>
+            </div>
+
+            <form>
+                <div class="form-group">
+                    <label class="form-label">日付 *</label>
+                    <input type="date" class="form-input" value="2026-06-15">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">金額 *</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="number" class="form-input" placeholder="0" style="flex: 1;">
+                        <span style="padding: 8px 12px; line-height: 1.4;">円</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">種類 *</label>
+                    <div class="radio-group">
+                        <label class="radio-item">
+                            <input type="radio" name="type" checked> 支出
+                        </label>
+                        <label class="radio-item">
+                            <input type="radio" name="type"> 収入
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">カテゴリ *</label>
+                    <select class="form-select">
+                        <option>食費</option>
+                        <option>交通費</option>
+                        <option>娯楽費</option>
+                        <option>医療費</option>
+                        <option>衣服費</option>
+                        <option>家賃・住宅</option>
+                        <option>光熱費</option>
+                        <option>通信費</option>
+                        <option>仕事関連</option>
+                        <option>その他</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">メモ（任意）</label>
+                    <textarea class="form-input" style="resize: vertical; min-height: 80px;" placeholder="メモを入力..."></textarea>
+                </div>
+
+                <div class="modal-buttons">
+                    <button type="button" class="btn btn-secondary" onclick="closeNewRecordDialog()">キャンセル</button>
+                    <button type="button" class="btn" onclick="saveRecord()">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Record Dialog (hidden by default) -->
+    <div id="edit-record-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>記録を編集</h2>
+                <button class="close-btn" onclick="closeEditDialog()">✕</button>
+            </div>
+
+            <form>
+                <div class="form-group">
+                    <label class="form-label">日付 *</label>
+                    <input type="date" class="form-input" value="2026-06-15">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">金額 *</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="number" class="form-input" value="1500" style="flex: 1;">
+                        <span style="padding: 8px 12px; line-height: 1.4;">円</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">種類 *</label>
+                    <div class="radio-group">
+                        <label class="radio-item">
+                            <input type="radio" name="type" checked> 支出
+                        </label>
+                        <label class="radio-item">
+                            <input type="radio" name="type"> 収入
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">カテゴリ *</label>
+                    <select class="form-select">
+                        <option selected>食費</option>
+                        <option>交通費</option>
+                        <option>娯楽費</option>
+                        <option>医療費</option>
+                        <option>衣服費</option>
+                        <option>家賃・住宅</option>
+                        <option>光熱費</option>
+                        <option>通信費</option>
+                        <option>仕事関連</option>
+                        <option>その他</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">メモ（任意）</label>
+                    <textarea class="form-input" style="resize: vertical; min-height: 80px;" placeholder="メモを入力..."></textarea>
+                </div>
+
+                <div class="modal-buttons">
+                    <button type="button" class="btn btn-secondary" onclick="closeEditDialog()">キャンセル</button>
+                    <button type="button" class="btn" onclick="saveRecord()">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- New Category Dialog -->
+    <div id="new-category-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>新規カテゴリ</h2>
+                <button class="close-btn" onclick="closeNewCategoryDialog()">✕</button>
+            </div>
+
+            <form>
+                <div class="form-group">
+                    <label class="form-label">カテゴリ名 *</label>
+                    <input type="text" class="form-input" placeholder="カテゴリ名を入力...">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">アイコン *</label>
+                    <select class="form-select">
+                        <option>👍</option>
+                        <option>😊</option>
+                        <option>❤️</option>
+                        <option>🎉</option>
+                        <option>🚗</option>
+                        <option>🏠</option>
+                        <option>💻</option>
+                        <option>📚</option>
+                    </select>
+                </div>
+
+                <div class="modal-buttons">
+                    <button type="button" class="btn btn-secondary" onclick="closeNewCategoryDialog()">キャンセル</button>
+                    <button type="button" class="btn" onclick="addCategory()">追加</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast notification -->
+    <div id="toast" class="toast"></div>
+
+    <script>
+        function toggleMenu() {
+            // menu implementation
+            console.log('Menu toggled');
+        }
+
+        function goHome() {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById('home-page').classList.add('active');
+        }
+
+        function goToChart() {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById('chart-page').classList.add('active');
+        }
+
+        function goToCategories() {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById('categories-page').classList.add('active');
+        }
+
+        function openNewRecordDialog() {
+            document.getElementById('new-record-modal').classList.add('active');
+        }
+
+        function closeNewRecordDialog() {
+            document.getElementById('new-record-modal').classList.remove('active');
+        }
+
+        function openEditDialog() {
+            document.getElementById('edit-record-modal').classList.add('active');
+        }
+
+        function closeEditDialog() {
+            document.getElementById('edit-record-modal').classList.remove('active');
+        }
+
+        function openNewCategoryDialog() {
+            document.getElementById('new-category-modal').classList.add('active');
+        }
+
+        function closeNewCategoryDialog() {
+            document.getElementById('new-category-modal').classList.remove('active');
+        }
+
+        function saveRecord() {
+            showToast('保存しました');
+            closeNewRecordDialog();
+            closeEditDialog();
+        }
+
+        function addCategory() {
+            showToast('カテゴリを追加しました');
+            closeNewCategoryDialog();
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
