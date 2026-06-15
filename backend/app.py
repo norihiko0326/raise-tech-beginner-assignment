@@ -1,74 +1,76 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from datetime import datetime, timedelta
-import json
+import sqlite3
+from pathlib import Path
 
 app = Flask(__name__)
 CORS(app)
 
-# テストデータ（実装時はDBに変更）
-MOCK_TRANSACTIONS = [
-    {
-        "id": 1,
-        "date": "2026-06-15",
-        "amount": 1500,
-        "type": "expense",
-        "category": "食費",
-        "memo": "ランチ"
-    },
-    {
-        "id": 2,
-        "date": "2026-06-14",
-        "amount": 150000,
-        "type": "income",
-        "category": "給料",
-        "memo": "月給"
-    },
-    {
-        "id": 3,
-        "date": "2026-06-10",
-        "amount": 2000,
-        "type": "expense",
-        "category": "交通費",
-        "memo": "バス定期"
-    }
-]
+# データベースパス
+DB_PATH = Path(__file__).parent / "household.db"
 
-MOCK_CATEGORIES = [
-    {"id": 1, "name": "食費", "icon": "🍔", "is_default": True},
-    {"id": 2, "name": "交通費", "icon": "🚌", "is_default": True},
-    {"id": 3, "name": "娯楽費", "icon": "🎬", "is_default": True},
-    {"id": 4, "name": "医療費", "icon": "💊", "is_default": True},
-    {"id": 5, "name": "衣服費", "icon": "👕", "is_default": True},
-    {"id": 6, "name": "家賃・住宅", "icon": "🏠", "is_default": True},
-    {"id": 7, "name": "光熱費", "icon": "💡", "is_default": True},
-    {"id": 8, "name": "通信費", "icon": "📱", "is_default": True},
-    {"id": 9, "name": "仕事関連", "icon": "💼", "is_default": True},
-    {"id": 10, "name": "その他", "icon": "🎁", "is_default": True},
-    {"id": 11, "name": "給料", "icon": "💰", "is_default": True},
-]
+
+def get_db_connection():
+    """データベース接続"""
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
 # ===== ヘルスチェック =====
 @app.route('/health', methods=['GET'])
 def health_check():
-    return jsonify({
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat()
-    }), 200
+    try:
+        conn = get_db_connection()
+        conn.execute("SELECT 1")
+        conn.close()
+        return jsonify({
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat(),
+            "database": "connected"
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "status": "unhealthy",
+            "error": str(e)
+        }), 500
 
 
 # ===== 収支 API =====
 @app.route('/api/transactions', methods=['GET'])
 def get_transactions():
     """収支一覧を取得"""
-    month = request.args.get('month')  # YYYY-MM 形式
+    month = request.args.get('month')
 
-    if month:
-        filtered = [t for t in MOCK_TRANSACTIONS if t['date'].startswith(month)]
-        return jsonify(filtered), 200
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
-    return jsonify(MOCK_TRANSACTIONS), 200
+        if month:
+            cursor.execute("""
+                SELECT t.id, t.date, t.amount, t.type, c.name as category, c.icon, t.memo
+                FROM transactions t
+                JOIN categories c ON t.category_id = c.id
+                WHERE strftime('%Y-%m', t.date) = ?
+                ORDER BY t.date DESC
+            """, (month,))
+        else:
+            cursor.execute("""
+                SELECT t.id, t.date, t.amount, t.type, c.name as category, c.icon, t.memo
+                FROM transactions t
+                JOIN categories c ON t.category_id = c.id
+                ORDER BY t.date DESC
+            """)
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        transactions = [dict(row) for row in rows]
+        return jsonify(transactions), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/api/transactions', methods=['POST'])
@@ -76,21 +78,47 @@ def create_transaction():
     """新しい収支を作成"""
     data = request.get_json()
 
-    # バリデーション（簡易版）
     if not data.get('date') or not data.get('amount') or not data.get('type') or not data.get('category'):
         return jsonify({"error": "必須項目が不足しています"}), 400
 
-    new_transaction = {
-        "id": max([t["id"] for t in MOCK_TRANSACTIONS]) + 1,
-        "date": data['date'],
-        "amount": data['amount'],
-        "type": data['type'],
-        "category": data['category'],
-        "memo": data.get('memo', '')
-    }
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
-    MOCK_TRANSACTIONS.append(new_transaction)
-    return jsonify(new_transaction), 201
+        # カテゴリID を取得
+        cursor.execute("SELECT id FROM categories WHERE name = ?", (data['category'],))
+        category_row = cursor.fetchone()
+
+        if not category_row:
+            conn.close()
+            return jsonify({"error": "カテゴリが見つかりません"}), 400
+
+        category_id = category_row['id']
+
+        # トランザクション挿入
+        cursor.execute("""
+            INSERT INTO transactions (date, amount, type, category_id, memo)
+            VALUES (?, ?, ?, ?, ?)
+        """, (data['date'], data['amount'], data['type'], category_id, data.get('memo', '')))
+
+        conn.commit()
+        transaction_id = cursor.lastrowid
+
+        # 挿入したデータを取得
+        cursor.execute("""
+            SELECT t.id, t.date, t.amount, t.type, c.name as category, c.icon, t.memo
+            FROM transactions t
+            JOIN categories c ON t.category_id = c.id
+            WHERE t.id = ?
+        """, (transaction_id,))
+
+        result = dict(cursor.fetchone())
+        conn.close()
+
+        return jsonify(result), 201
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/api/transactions/<int:transaction_id>', methods=['PUT'])
@@ -98,68 +126,178 @@ def update_transaction(transaction_id):
     """収支を更新"""
     data = request.get_json()
 
-    transaction = next((t for t in MOCK_TRANSACTIONS if t['id'] == transaction_id), None)
-    if not transaction:
-        return jsonify({"error": "取引が見つかりません"}), 404
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
-    transaction.update(data)
-    return jsonify(transaction), 200
+        # 既存トランザクションを確認
+        cursor.execute("SELECT * FROM transactions WHERE id = ?", (transaction_id,))
+        if not cursor.fetchone():
+            conn.close()
+            return jsonify({"error": "取引が見つかりません"}), 404
+
+        # カテゴリIDを取得（カテゴリが指定されている場合）
+        category_id = None
+        if 'category' in data:
+            cursor.execute("SELECT id FROM categories WHERE name = ?", (data['category'],))
+            category_row = cursor.fetchone()
+            if not category_row:
+                conn.close()
+                return jsonify({"error": "カテゴリが見つかりません"}), 400
+            category_id = category_row['id']
+
+        # 更新フィールドを構築
+        update_fields = []
+        params = []
+
+        if 'date' in data:
+            update_fields.append("date = ?")
+            params.append(data['date'])
+        if 'amount' in data:
+            update_fields.append("amount = ?")
+            params.append(data['amount'])
+        if 'type' in data:
+            update_fields.append("type = ?")
+            params.append(data['type'])
+        if category_id:
+            update_fields.append("category_id = ?")
+            params.append(category_id)
+        if 'memo' in data:
+            update_fields.append("memo = ?")
+            params.append(data['memo'])
+
+        if not update_fields:
+            conn.close()
+            return jsonify({"error": "更新するフィールドがありません"}), 400
+
+        update_fields.append("updated_at = CURRENT_TIMESTAMP")
+        params.append(transaction_id)
+
+        cursor.execute(
+            f"UPDATE transactions SET {', '.join(update_fields)} WHERE id = ?",
+            params
+        )
+        conn.commit()
+
+        # 更新後のデータを取得
+        cursor.execute("""
+            SELECT t.id, t.date, t.amount, t.type, c.name as category, c.icon, t.memo
+            FROM transactions t
+            JOIN categories c ON t.category_id = c.id
+            WHERE t.id = ?
+        """, (transaction_id,))
+
+        result = dict(cursor.fetchone())
+        conn.close()
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/api/transactions/<int:transaction_id>', methods=['DELETE'])
 def delete_transaction(transaction_id):
     """収支を削除"""
-    global MOCK_TRANSACTIONS
-    MOCK_TRANSACTIONS = [t for t in MOCK_TRANSACTIONS if t['id'] != transaction_id]
-    return jsonify({"message": "削除しました"}), 200
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("DELETE FROM transactions WHERE id = ?", (transaction_id,))
+
+        if cursor.rowcount == 0:
+            conn.close()
+            return jsonify({"error": "取引が見つかりません"}), 404
+
+        conn.commit()
+        conn.close()
+
+        return jsonify({"message": "削除しました"}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ===== 集計 API =====
 @app.route('/api/summary/<year_month>', methods=['GET'])
 def get_summary(year_month):
     """月別の収支サマリーを取得"""
-    month_transactions = [t for t in MOCK_TRANSACTIONS if t['date'].startswith(year_month)]
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
-    income = sum(t['amount'] for t in month_transactions if t['type'] == 'income')
-    expense = sum(t['amount'] for t in month_transactions if t['type'] == 'expense')
-    balance = income - expense
+        cursor.execute("""
+            SELECT
+                SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) as income,
+                SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) as expense
+            FROM transactions
+            WHERE strftime('%Y-%m', date) = ?
+        """, (year_month,))
 
-    return jsonify({
-        "month": year_month,
-        "income": income,
-        "expense": expense,
-        "balance": balance
-    }), 200
+        row = cursor.fetchone()
+        conn.close()
+
+        income = row['income'] or 0
+        expense = row['expense'] or 0
+        balance = income - expense
+
+        return jsonify({
+            "month": year_month,
+            "income": income,
+            "expense": expense,
+            "balance": balance
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/api/chart-data', methods=['GET'])
 def get_chart_data():
     """過去6ヶ月のグラフデータを取得"""
-    today = datetime.now()
-    data = []
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
-    for i in range(6):
-        month_date = today - timedelta(days=30*i)
-        year_month = month_date.strftime('%Y-%m')
+        # 過去6ヶ月のデータを取得
+        cursor.execute("""
+            SELECT
+                strftime('%Y-%m', date) as month,
+                SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) as income,
+                SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) as expense
+            FROM transactions
+            WHERE date >= date('now', '-6 months')
+            GROUP BY strftime('%Y-%m', date)
+            ORDER BY month
+        """)
 
-        month_transactions = [t for t in MOCK_TRANSACTIONS if t['date'].startswith(year_month)]
-        income = sum(t['amount'] for t in month_transactions if t['type'] == 'income')
-        expense = sum(t['amount'] for t in month_transactions if t['type'] == 'expense')
+        rows = cursor.fetchall()
+        conn.close()
 
-        data.append({
-            "month": year_month,
-            "income": income,
-            "expense": expense
-        })
+        data = [dict(row) for row in rows]
+        return jsonify(data), 200
 
-    return jsonify(data[::-1]), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ===== カテゴリ API =====
 @app.route('/api/categories', methods=['GET'])
 def get_categories():
     """カテゴリ一覧を取得"""
-    return jsonify(MOCK_CATEGORIES), 200
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT id, name, icon, is_default FROM categories ORDER BY is_default DESC, id")
+        rows = cursor.fetchall()
+        conn.close()
+
+        categories = [dict(row) for row in rows]
+        return jsonify(categories), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/api/categories', methods=['POST'])
@@ -170,35 +308,57 @@ def create_category():
     if not data.get('name') or not data.get('icon'):
         return jsonify({"error": "カテゴリ名とアイコンは必須です"}), 400
 
-    # 重複チェック
-    if any(c['name'] == data['name'] for c in MOCK_CATEGORIES):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "INSERT INTO categories (name, icon, is_default) VALUES (?, ?, 0)",
+            (data['name'], data['icon'])
+        )
+        conn.commit()
+        category_id = cursor.lastrowid
+
+        # 挿入したデータを取得
+        cursor.execute("SELECT id, name, icon, is_default FROM categories WHERE id = ?", (category_id,))
+        result = dict(cursor.fetchone())
+        conn.close()
+
+        return jsonify(result), 201
+
+    except sqlite3.IntegrityError:
         return jsonify({"error": "カテゴリは既に存在します"}), 400
-
-    new_category = {
-        "id": max([c["id"] for c in MOCK_CATEGORIES]) + 1,
-        "name": data['name'],
-        "icon": data['icon'],
-        "is_default": False
-    }
-
-    MOCK_CATEGORIES.append(new_category)
-    return jsonify(new_category), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/api/categories/<int:category_id>', methods=['DELETE'])
 def delete_category(category_id):
     """カテゴリを削除"""
-    global MOCK_CATEGORIES
-    category = next((c for c in MOCK_CATEGORIES if c['id'] == category_id), None)
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
-    if not category:
-        return jsonify({"error": "カテゴリが見つかりません"}), 404
+        # 初期カテゴリか確認
+        cursor.execute("SELECT is_default FROM categories WHERE id = ?", (category_id,))
+        row = cursor.fetchone()
 
-    if category['is_default']:
-        return jsonify({"error": "初期カテゴリは削除できません"}), 400
+        if not row:
+            conn.close()
+            return jsonify({"error": "カテゴリが見つかりません"}), 404
 
-    MOCK_CATEGORIES = [c for c in MOCK_CATEGORIES if c['id'] != category_id]
-    return jsonify({"message": "削除しました"}), 200
+        if row['is_default']:
+            conn.close()
+            return jsonify({"error": "初期カテゴリは削除できません"}), 400
+
+        cursor.execute("DELETE FROM categories WHERE id = ?", (category_id,))
+        conn.commit()
+        conn.close()
+
+        return jsonify({"message": "削除しました"}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ===== エラーハンドリング =====
@@ -218,6 +378,6 @@ if __name__ == '__main__':
     print("=" * 50)
     print("📍 ローカルURL: http://localhost:5000")
     print("🏥 ヘルスチェック: http://localhost:5000/health")
-    print("📚 API仕様: 下記のエンドポイントを参照")
+    print("🗄️ データベース: SQLite (household.db)")
     print("=" * 50)
     app.run(debug=True, host='127.0.0.1', port=5000)
