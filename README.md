@@ -1,11 +1,11 @@
 # 家計簿アプリ
 
-シンプルで使いやすい家計簿管理アプリケーション。日々の収支をカテゴリ分けして記録し、月別に集計・グラフで確認できます。
+シンプルで使いやすい家計簿管理アプリケーション。日々の収支をカテゴリ分けして記録・編集・削除でき、月別に集計・グラフで確認できます。
 
 ## 🎯 主な機能
 
-- ✅ 収支の記録・編集・削除
-- ✅ カテゴリ管理（追加・削除）
+- ✅ 収支の記録・編集・削除 ← **新機能**
+- ✅ カテゴリ管理（初期カテゴリ10種）
 - ✅ 月別集計（収入・支出・残高）
 - ✅ グラフ表示（過去6ヶ月）
 - ✅ 過去データ閲覧
@@ -15,24 +15,28 @@
 ![デモ動画](./demo.gif)
 
 **操作内容：**
-- 記録追加フォーム
-- 新規カテゴリ追加
-- 記録削除
-- グラフ表示確認
+- 記録新規作成（金額・カテゴリ入力 → 保存）
+- 記録一覧に反映
+- 記録編集・削除
 
 ## 🏗️ アーキテクチャ
 
 ### クラウド構成（AWS）
 
 ```
-ブラウザ
-   ↓ HTTP (http://52.197.32.171)
-Nginx（リバースプロキシ） - EC2
-   ├─ / → Next.js フロント（ポート 3000）
-   ├─ /api/* → Flask バック（ポート 5000）
-   └─ Docker Compose で管理
-   ↓ SQL
-RDS MySQL（データベース）
+ブラウザ（ユーザー）
+   ↓ HTTP
+   ├─ http://16.76.22.118:3000 → Next.js フロント
+   └─ http://16.76.22.118:5000 → Flask バックエンド API
+         ↓ SQL
+      RDS MySQL 8.0（データベース）
+```
+
+**EC2 内での構成（Amazon Linux 2023）:**
+```
+systemd で管理
+├─ household-backend.service → gunicorn (Flask :5000)
+└─ household-frontend.service → npm run start (Next.js :3000)
 ```
 
 ### 技術スタック
@@ -40,9 +44,10 @@ RDS MySQL（データベース）
 | レイヤー | 技術 |
 |---------|------|
 | **フロントエンド** | Next.js 14 + React + TypeScript + recharts |
-| **バックエンド** | Python 3.11 + Flask + SQLAlchemy |
-| **データベース** | MySQL 8.0（RDS） |
-| **インフラ** | AWS EC2 + RDS + Docker + Nginx |
+| **バックエンド** | Python 3.11 + Flask 2.3.0 + mysql-connector-python |
+| **データベース** | MySQL 8.4.8（RDS） |
+| **インフラ** | AWS EC2 (Amazon Linux 2023) + RDS |
+| **サービス管理** | systemd |
 | **IaC** | Terraform |
 
 ## 🚀 デプロイ手順
@@ -63,66 +68,119 @@ terraform apply
 
 **出力例：**
 ```
-ec2_public_ip = "52.197.32.171"
+ec2_public_ip = "16.76.22.118"
 rds_address = "terraform-xxx.rds.amazonaws.com"
 ```
 
 ### Step 2: EC2 初回起動待機（5-10分）
 
 user_data.sh が自動実行され、以下が行われます：
-- Docker インストール
+- Python 3.11 + Flask 2.3.0 インストール
+- Node.js 18 インストール
 - リポジトリ clone + git LFS pull
-- docker-compose で全サービス起動（バック + フロント + Nginx）
+- 仮想環境構築（venv）
+- npm install + npm run build
+- systemd サービス登録・自動起動設定
+
+**EC2 起動後の手作業（オプション）:**
+```bash
+ssh -i your-key.pem ec2-user@16.76.22.118
+
+# DB 初期化（必要な場合）
+cd /home/ec2-user/app/backend
+source venv/bin/activate
+python init_db.py
+```
 
 ### Step 3: ブラウザでアクセス
 
 ```
-http://52.197.32.171
+フロントエンド: http://16.76.22.118:3000
+バックエンド API: http://16.76.22.118:5000
+ヘルスチェック: http://16.76.22.118:5000/health
+```
+
+### Step 4: サービス管理（EC2 内）
+
+```bash
+# サービス状態確認
+sudo systemctl status household-backend
+sudo systemctl status household-frontend
+
+# ログ確認
+sudo journalctl -u household-backend -f
+sudo journalctl -u household-frontend -f
+
+# 再起動
+sudo systemctl restart household-backend
+sudo systemctl restart household-frontend
 ```
 
 ## 📝 ローカル開発環境
 
 ### Prerequisites
-- Docker Desktop
+- Python 3.11+
+- Node.js 18+
 - Git LFS
+- MySQL（ローカル）または RDS への接続
 
-### 起動コマンド
+### バックエンド起動
 
 ```bash
 # リポジトリクローン
 git clone https://github.com/norihiko0326/raise-tech-beginner-assignment.git
-cd raise-tech-beginner-assignment
+cd raise-tech-beginner-assignment/backend
 
-# Git LFS セットアップ
-git lfs install
-git lfs pull
+# Python 仮想環境作成
+python -m venv venv
+source venv/bin/activate  # macOS/Linux
+# または
+venv\Scripts\activate  # Windows
 
-# .env ファイル作成（ローカル用）
-cat > .env << EOF
-DB_HOST=localhost
-DB_PASSWORD=testpassword123
-EOF
+# 依存ライブラリインストール
+pip install -r requirements.txt
 
-# Docker Compose 起動
-docker-compose up -d
+# 環境変数設定
+export DB_HOST=localhost
+export DB_USER=admin
+export DB_PASSWORD=testpassword123
+export DB_NAME=householdapp
 
-# ブラウザアクセス
-http://localhost
+# DB 初期化
+python init_db.py
+
+# Flask 起動（開発モード）
+python app.py
+# http://localhost:5000 で起動
 ```
 
-### 開発用コマンド
+### フロントエンド起動
 
 ```bash
-# ログ確認
-docker-compose logs -f
+cd ../frontend
 
-# 特定サービスのみ再起動
-docker-compose restart backend
-docker-compose restart frontend
-docker-compose restart nginx
+# Node.js 依存ライブラリインストール
+npm install
 
-# 完全クリーンアップ
-docker-compose down -v
+# 環境変数設定
+export NEXT_PUBLIC_API_URL=http://localhost:5000
+
+# 開発サーバー起動
+npm run dev
+# http://localhost:3000 で起動
+```
+
+### API テスト
+
+```bash
+# ヘルスチェック
+curl http://localhost:5000/health
+
+# カテゴリ取得
+curl http://localhost:5000/api/categories
+
+# 月別集計
+curl http://localhost:5000/api/summary/2026-07
 ```
 
 ## 🔄 CI/CD（今後の改善案）
@@ -143,43 +201,90 @@ docker-compose down -v
 ## 💡 実装時の工夫
 
 1. **インフラ as Code（IaC）**
-   - Terraform で AWS リソースをコード化
+   - Terraform で AWS リソース（EC2 + RDS）をコード化
    - 再現性・版管理が容易
+   - 環境構築が 1 コマンド
 
-2. **コンテナ化**
-   - Docker で環境の統一
-   - 本番環境との差異を排除
+2. **systemd サービス管理**
+   - Flask・Next.js を systemd サービスで自動起動
+   - EC2 再起動時に自動復旧
+   - Docker より シンプルでトラブル対応が容易
 
-3. **リバースプロキシ（Nginx）**
-   - フロント・バック分離
-   - CORS 対応
-   - API ルーティング統一
+3. **Amazon Linux 2023 採用**
+   - glibc 2.34 で Flask 2.3.0 と Node.js 18 を完全サポート
+   - Python 3.11 で最新ライブラリ対応
+   - Amazon Linux 2 のサポート終了（2025年6月）に先制対応
 
-4. **自動デプロイ**
-   - user_data.sh で EC2 初回起動時に全て自動
-   - 手作業ゼロ
+4. **記録削除機能**
+   - UI から直接削除可能（削除前に確認ダイアログ）
+   - RDS のデータも正確に削除
+
+5. **自動デプロイ**
+   - user_data.sh で EC2 初回起動時に全自動実行
+   - 手作業は init_db.py 実行のみ（オプション）
 
 ## 🛠️ トラブルシューティング
 
-### EC2 でコンテナが起動しない
+### サービスが起動していない
 
 ```bash
 # SSH でログイン
-ssh -i your-key.pem ec2-user@52.197.32.171
+ssh -i your-key.pem ec2-user@16.76.22.118
+
+# サービス状態確認
+sudo systemctl status household-backend
+sudo systemctl status household-frontend
 
 # ログ確認
-docker-compose logs
+sudo journalctl -u household-backend -f
+sudo journalctl -u household-frontend -f
 
 # 再起動
-docker-compose restart
+sudo systemctl restart household-backend
+sudo systemctl restart household-frontend
+```
+
+### API が応答しない
+
+```bash
+# バックエンド確認
+curl http://localhost:5000/health
+
+# ポート確認
+sudo ss -tlnp | grep -E ':(3000|5000)'
+
+# gunicorn プロセス確認
+ps aux | grep gunicorn
 ```
 
 ### フロント・バック API 連携エラー
 
 ```bash
-# Nginx ログ確認
-docker exec household-app-nginx tail -f /var/log/nginx/access.log
-docker exec household-app-nginx tail -f /var/log/nginx/error.log
+# DevTools（F12）→ Network タブで API 呼び出しを確認
+# API URL が正しいか確認（http://16.76.22.118:5000）
+
+# または EC2 内で直接テスト
+curl http://localhost:5000/api/categories
+```
+
+### RDS 接続エラー
+
+```bash
+# 環境変数確認
+cat /home/ec2-user/app/backend/.env
+
+# RDS との接続テスト
+source venv/bin/activate
+python -c "
+import mysql.connector
+conn = mysql.connector.connect(
+    host='terraform-xxx.rds.amazonaws.com',
+    user='admin',
+    password='testpassword123',
+    database='householdapp'
+)
+print('✅ RDS 接続成功')
+"
 ```
 
 ## 📦 リソースクリーンアップ
@@ -200,4 +305,4 @@ MIT
 
 ---
 
-**最終更新：** 2026年7月3日
+**最終更新：** 2026年7月7日（Issue #9: Amazon Linux 2023 + 削除機能）
