@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { addMonths, format } from 'date-fns';
 import { Header } from '@/components/Header';
 import { SummaryBox } from '@/components/SummaryBox';
@@ -52,6 +52,16 @@ export default function Home() {
     }
   };
 
+  const handleDeleteTransaction = async (id: number) => {
+    try {
+      await transactionApi.delete(id);
+      showToast('記録を削除しました', 'success');
+      await refetchTransactions();
+    } catch (err) {
+      showToast('削除に失敗しました', 'error');
+    }
+  };
+
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 2000);
@@ -82,6 +92,7 @@ export default function Home() {
         transaction={selectedTransaction}
         categories={categories}
         onSave={handleSaveTransaction}
+        onDelete={handleDeleteTransaction}
         onClose={() => {
           setIsDialogOpen(false);
           setSelectedTransaction(undefined);

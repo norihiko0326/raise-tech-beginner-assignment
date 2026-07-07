@@ -8,6 +8,7 @@ interface TransactionDialogProps {
   transaction?: Transaction;
   categories: Category[];
   onSave: (data: TransactionInput) => Promise<void>;
+  onDelete?: (id: number) => Promise<void>;
   onClose: () => void;
 }
 
@@ -16,6 +17,7 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
   transaction,
   categories,
   onSave,
+  onDelete,
   onClose,
 }) => {
   const [formData, setFormData] = useState<TransactionInput>({
@@ -27,6 +29,7 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (transaction) {
@@ -73,6 +76,22 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
       setErrors({ submit: '保存に失敗しました' });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!transaction || !onDelete) return;
+
+    if (!confirm('本当に削除しますか？')) return;
+
+    setIsDeleting(true);
+    try {
+      await onDelete(transaction.id);
+      onClose();
+    } catch (err) {
+      setErrors({ submit: '削除に失敗しました' });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -223,7 +242,7 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
           <div className="flex gap-2">
             <button
               type="submit"
-              disabled={isSaving}
+              disabled={isSaving || isDeleting}
               className="flex-1 bg-blue-600 text-white py-2 rounded font-medium hover:bg-blue-700 transition disabled:opacity-50"
             >
               {isSaving ? '保存中...' : '保存'}
@@ -231,11 +250,21 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
             <button
               type="button"
               onClick={onClose}
-              disabled={isSaving}
+              disabled={isSaving || isDeleting}
               className="flex-1 bg-gray-300 text-black py-2 rounded font-medium hover:bg-gray-400 transition disabled:opacity-50"
             >
               キャンセル
             </button>
+            {transaction && onDelete && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isSaving || isDeleting}
+                className="flex-1 bg-red-600 text-white py-2 rounded font-medium hover:bg-red-700 transition disabled:opacity-50"
+              >
+                {isDeleting ? '削除中...' : '削除'}
+              </button>
+            )}
           </div>
         </form>
       </div>
