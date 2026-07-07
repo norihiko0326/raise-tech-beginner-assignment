@@ -44,8 +44,7 @@ def init_database():
                 updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 FOREIGN KEY (category_id) REFERENCES categories(id),
                 INDEX idx_transactions_date (date),
-                INDEX idx_transactions_created_at (created_at),
-                INDEX idx_categories_name (name)
+                INDEX idx_transactions_created_at (created_at)
             )
         """)
 

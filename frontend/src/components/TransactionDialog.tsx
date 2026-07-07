@@ -20,7 +20,7 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
 }) => {
   const [formData, setFormData] = useState<TransactionInput>({
     date: new Date().toISOString().split('T')[0],
-    amount: 0,
+    amount: undefined as any,
     type: 'expense',
     category: categories[0]?.name || '',
     memo: '',
@@ -40,7 +40,7 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
     } else {
       setFormData({
         date: new Date().toISOString().split('T')[0],
-        amount: 0,
+        amount: undefined as any,
         type: 'expense',
         category: categories[0]?.name || '',
         memo: '',
@@ -54,7 +54,7 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
 
     const newErrors: Record<string, string> = {};
     if (!formData.date) newErrors.date = '日付は必須です';
-    if (formData.amount < 1 || formData.amount > 9999999)
+    if (!formData.amount || formData.amount < 1 || formData.amount > 9999999)
       newErrors.amount = '1～9,999,999円で入力してください';
     if (!formData.category) newErrors.category = 'カテゴリは必須です';
     if (formData.memo && formData.memo.length > 255)
@@ -119,12 +119,13 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
             </label>
             <input
               type="number"
-              value={formData.amount}
+              value={formData.amount || ''}
               onChange={(e) =>
-                setFormData({ ...formData, amount: +e.target.value })
+                setFormData({ ...formData, amount: e.target.value ? +e.target.value : undefined as any })
               }
               disabled={isSaving}
               className="w-full border border-gray-300 rounded px-3 py-2"
+              placeholder="金額を入力"
               min="1"
               max="9999999"
             />
