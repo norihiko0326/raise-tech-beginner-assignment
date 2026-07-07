@@ -8,6 +8,7 @@ interface TransactionDialogProps {
   transaction?: Transaction;
   categories: Category[];
   onSave: (data: TransactionInput) => Promise<void>;
+  onDelete?: (id: number) => Promise<void>;
   onClose: () => void;
 }
 
@@ -16,17 +17,19 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
   transaction,
   categories,
   onSave,
+  onDelete,
   onClose,
 }) => {
   const [formData, setFormData] = useState<TransactionInput>({
     date: new Date().toISOString().split('T')[0],
-    amount: 0,
+    amount: undefined as any,
     type: 'expense',
     category: categories[0]?.name || '',
     memo: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (transaction) {
@@ -40,7 +43,7 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
     } else {
       setFormData({
         date: new Date().toISOString().split('T')[0],
-        amount: 0,
+        amount: undefined as any,
         type: 'expense',
         category: categories[0]?.name || '',
         memo: '',
@@ -54,7 +57,7 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
 
     const newErrors: Record<string, string> = {};
     if (!formData.date) newErrors.date = '日付は必須です';
-    if (formData.amount < 1 || formData.amount > 9999999)
+    if (!formData.amount || formData.amount < 1 || formData.amount > 9999999)
       newErrors.amount = '1～9,999,999円で入力してください';
     if (!formData.category) newErrors.category = 'カテゴリは必須です';
     if (formData.memo && formData.memo.length > 255)
@@ -73,6 +76,22 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
       setErrors({ submit: '保存に失敗しました' });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!transaction || !onDelete) return;
+
+    if (!confirm('本当に削除しますか？')) return;
+
+    setIsDeleting(true);
+    try {
+      await onDelete(transaction.id);
+      onClose();
+    } catch (err) {
+      setErrors({ submit: '削除に失敗しました' });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -119,12 +138,13 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
             </label>
             <input
               type="number"
-              value={formData.amount}
+              value={formData.amount || ''}
               onChange={(e) =>
-                setFormData({ ...formData, amount: +e.target.value })
+                setFormData({ ...formData, amount: e.target.value ? +e.target.value : undefined as any })
               }
               disabled={isSaving}
               className="w-full border border-gray-300 rounded px-3 py-2"
+              placeholder="金額を入力"
               min="1"
               max="9999999"
             />
@@ -222,7 +242,7 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
           <div className="flex gap-2">
             <button
               type="submit"
-              disabled={isSaving}
+              disabled={isSaving || isDeleting}
               className="flex-1 bg-blue-600 text-white py-2 rounded font-medium hover:bg-blue-700 transition disabled:opacity-50"
             >
               {isSaving ? '保存中...' : '保存'}
@@ -230,11 +250,21 @@ export const TransactionDialog: React.FC<TransactionDialogProps> = ({
             <button
               type="button"
               onClick={onClose}
-              disabled={isSaving}
+              disabled={isSaving || isDeleting}
               className="flex-1 bg-gray-300 text-black py-2 rounded font-medium hover:bg-gray-400 transition disabled:opacity-50"
             >
               キャンセル
             </button>
+            {transaction && onDelete && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isSaving || isDeleting}
+                className="flex-1 bg-red-600 text-white py-2 rounded font-medium hover:bg-red-700 transition disabled:opacity-50"
+              >
+                {isDeleting ? '削除中...' : '削除'}
+              </button>
+            )}
           </div>
         </form>
       </div>
