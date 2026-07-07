@@ -1,11 +1,11 @@
-﻿# 最新の Amazon Linux 2 AMI を自動検索
+﻿# 最新の Amazon Linux 2023 AMI を自動検索
 data "aws_ami" "amazon_linux_2" {
   most_recent = true
   owners      = ["amazon"]
 
   filter {
     name   = "name"
-    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+    values = ["al2023-ami-*-x86_64"]
   }
 
   filter {

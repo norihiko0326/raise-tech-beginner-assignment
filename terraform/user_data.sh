@@ -10,9 +10,9 @@ echo "EC2 initialization started at $(date)"
 echo "Updating system..."
 yum update -y
 
-# Python インストール
+# Python インストール（Amazon Linux 2023 では python3.11 がデフォルト）
 echo "Installing Python..."
-yum install -y python3 python3-venv python3-pip
+yum install -y python3 python3-venv python3-pip python3.11-devel
 
 # git インストール
 echo "Installing Git..."
